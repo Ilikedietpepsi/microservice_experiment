@@ -1,0 +1,4 @@
+nameko==2.14.1
+asyncio==3.4.3
+aiomysql==0.2.0
+selectors==0.0.14
