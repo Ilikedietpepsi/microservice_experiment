@@ -1,0 +1,2 @@
+nameko==2.14.1
+mysql-connector-python==8.3.0
