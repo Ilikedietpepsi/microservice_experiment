@@ -1,0 +1,198 @@
+version: '3.6'
+
+networks:
+  mysqlcomposenetwork:
+    driver: bridge
+
+services:
+  api:
+    image: api9.1
+    container_name: flask_app
+    ports:
+    - "8080:8080"
+    restart: always
+    links:
+    - rabbit
+    - http_service
+    - send_request_service
+    - sync_mysql_y
+    - async_mysql_x
+    - sync_redis_x
+    - mysql
+    - redis
+    environment:
+    - ENV=1
+    - FLASK_APP=app.py
+    - FLASK_DEBUG=1
+    build:
+      context: ./api
+      dockerfile: ./Dockerfile
+    depends_on:
+      - rabbit
+    command: flask run --host=0.0.0.0 --port 8080
+    networks:
+      - mysqlcomposenetwork
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: '512M'
+  async_mysql_x:
+    container_name: async_mysql_container
+    image: async_mysql_x:v6.7
+    restart: always
+    build:
+      context: ./async_mysql_x
+      dockerfile: ./Dockerfile
+    depends_on:
+      - rabbit
+      - mysql
+    command: nameko run --config ./config.yaml async_mysql_x
+    networks:
+      - mysqlcomposenetwork
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: '512M'
+  sync_mysql_y:
+    container_name: sync_mysql_y_container
+    image: sync_mysql_y:v99
+    restart: always
+    build:
+      context: ./sync_mysql_y
+      dockerfile: ./Dockerfile
+    depends_on:
+      - rabbit
+      - mysql
+      - sync_mysql_x
+    command: nameko run --config ./config.yaml sync_mysql_y
+    networks:
+      - mysqlcomposenetwork
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: '512M'
+  sync_redis_x:
+    container_name: sync_redis_x_container
+    image: sync_redis_x:v88
+    restart: always
+    build:
+      context: ./sync_redis_x
+      dockerfile: ./Dockerfile
+    depends_on:
+      - rabbit
+      - redis
+    command: nameko run --config ./config.yaml sync_redis_x
+    networks:
+      - mysqlcomposenetwork
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: '512M'
+  sync_mysql_x:
+    container_name: sync_mysql_container
+    image: sync_mysql_x:v99
+    restart: always
+    build:
+      context: ./sync_mysql_x
+      dockerfile: ./Dockerfile
+    links:
+      - mysql
+    depends_on:
+      - rabbit
+      - mysql
+    command: nameko run --config ./config.yaml sync_mysql_x
+    networks:
+      - mysqlcomposenetwork
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: '512M'
+  rabbit:
+    container_name: rabbitmq
+    image: rabbitmq:3-management
+    restart: always
+    hostname: rabbit
+    ports:
+    - 5672:5672
+    - 15672:15672
+    environment:
+      RABBITMQ_ERLANG_COOKIE:
+      RABBITMQ_DEFAULT_VHOST: /
+      RABBITMQ_DEFAULT_USER: 'guest'
+      RABBITMQ_DEFAULT_PASS: 'guest'
+    networks:
+      - mysqlcomposenetwork
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: '512M'
+
+  mysql:
+    image: mysql:8.3.0
+    restart: always
+    hostname: mysql
+    environment:
+      MYSQL_DATABASE: 'test'
+      MYSQL_ROOT_PASSWORD: 'hezhenmin2000'
+    ports:
+      - "32000:3306"
+    networks:
+      - mysqlcomposenetwork
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: '512M'
+  redis:
+    image: redis:latest
+    restart: always
+    hostname: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - mysqlcomposenetwork
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: '512M'
+  http_service:
+    container_name: http_service_container
+    image: http_service:v1.6
+    restart: always
+    build:
+      context: ./http_service
+    depends_on:
+      - rabbit
+      - mysql
+    command: nameko run --config ./config.yaml http_service
+    networks:
+      - mysqlcomposenetwork
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: '512M'
+  send_request_service:
+    container_name: send_request_service_container
+    image: send_request_service:v1.3
+    restart: always
+    build:
+      context: ./send_request_service
+    depends_on:
+      - rabbit
+      - mysql
+    command: nameko run --config ./config.yaml request
+    networks:
+      - mysqlcomposenetwork
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: '512M'
