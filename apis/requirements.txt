@@ -1,0 +1,5 @@
+nameko==2.14.1
+flask[async]
+mysql-connector-python==8.3.0
+werkzeug==3.0.1
+redis==5.0.3
